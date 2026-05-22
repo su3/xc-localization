@@ -6,6 +6,8 @@ A Claude Code skill for efficient Xcode project localization.
 
 This skill handles `.xcstrings` file localization for Xcode projects. It uses a token-efficient workflow that extracts only untranslated entries rather than reading entire files into context.
 
+As an Xcode project grows to support more languages, naively reading and writing thousands of lines of `.xcstrings` files burns through tokens fast. This skill keeps context lean by working only with what needs translating — completing in a few minutes what would otherwise take over 30, using just a few kilobytes of tokens.
+
 ## Installation
 
 Copy the skill directory into Claude Code's skills folder.
