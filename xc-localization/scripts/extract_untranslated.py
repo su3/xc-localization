@@ -46,6 +46,10 @@ def main():
         if entry.get("extractionState") == "stale":
             continue
 
+        # Skip keys marked as not translatable
+        if entry.get("shouldTranslate") is False:
+            continue
+
         locs = entry.get("localizations", {})
         tgt = locs.get(target, {})
         unit = tgt.get("stringUnit", {})
