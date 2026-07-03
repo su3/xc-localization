@@ -93,12 +93,17 @@ python3 scripts/apply_translations.py <path/to/file.xcstrings> <target_lang> tra
 
 The script:
 
-- Creates a timestamped temporary backup automatically, named like `Localizable.xcstrings.bak.<timestamp>`
-- Prints the exact backup path to stderr as `Backup: <path>`; keep that path for cleanup or rollback
+- Creates a timestamped backup automatically (e.g., `Localizable.xcstrings.bak.20260702143800`)
 - Inserts/updates `localizations.<target>.stringUnit` with `state: "translated"`
 - Preserves Xcode's 2-space JSON formatting
 
-Treat the `.xcstrings.bak.*` file as a temporary working file only. Do not add it to `.xcodeproj`, `project.pbxproj`, build phases, resource lists, or localization resources.
+> **⚠️ Clean up backup files** — After all languages are applied, remove `.bak` files:
+>
+> ```bash
+> rm -v <path/to/*.xcstrings.bak.*>
+> ```
+>
+> Each `apply_translations.py` call creates one backup. Multiple runs produce multiple `.bak` files. They are safe to delete once you've verified the main `.xcstrings` file is correct.
 
 ---
 
@@ -111,25 +116,11 @@ python3 scripts/extract_untranslated.py <path/to/file.xcstrings> <target_lang>
 # Expected output: {}
 ```
 
-If verification fails, keep the `.xcstrings.bak.*` file so the user can inspect or restore the original.
-
----
-
-### Step 5 — Cleanup temporary backup
-
-After verification succeeds, delete the exact temporary backup file reported by `apply_translations.py`:
-
-```bash
-rm <path/to/Localizable.xcstrings.bak.timestamp>
-```
-
-Only delete the backup generated for this apply run. Never delete unrelated `.bak.*` files unless the user explicitly asks.
-
 ---
 
 ## Multiple Languages / Multiple Files
 
-**Multiple target languages:** Repeat Steps 1–5 for each language.
+**Multiple target languages:** Repeat Steps 1–4 for each language.
 
 **Multiple `.xcstrings` files:** Process each file independently:
 
@@ -138,8 +129,6 @@ for f in path/to/*.xcstrings; do
     python3 scripts/extract_untranslated.py "$f" ja > "todo_$(basename $f .xcstrings).json"
 done
 ```
-
-For each file, use the full sequence `extract → translate → apply → verify → cleanup` before moving on when practical. This prevents stale `.xcstrings.bak.*` files from accumulating and keeps backups scoped to a single apply run.
 
 ---
 
@@ -184,18 +173,23 @@ print(f'Created {-(-len(items)//size)} batch files')
     "Old string": {
       "extractionState": "stale",
       "localizations": { ... }
+    },
+    // Non-translatable key — SKIP entirely
+    "AudioKit:": {
+      "shouldTranslate": false
     }
   },
   "version": "1.0"
 }
 ```
 
-**`extractionState` values:**
-| Value | Action |
+**Top-level key fields:**
+| Field | Action |
 |-------|--------|
-| _(absent)_ | Process normally |
-| `stale` | ⛔ Skip entirely — source changed, developer resolves |
-| `manual` | Process normally — manually added key |
+| `shouldTranslate: false` | ⛔ Skip entirely — app-internal key, not for translation |
+| `extractionState: "stale"` | ⛔ Skip entirely — source changed, developer resolves |
+| `extractionState: "manual"` | Process normally — manually added key |
+| _(neither present)_ | Process normally |
 
 **`stringUnit.state` values:**
 | Value | Action |
@@ -247,3 +241,12 @@ file Localizable.xcstrings  # Should be UTF-8
 **Keys revert after Xcode build** — Ensure "Use Compiler to Extract Swift Strings" is configured. Translations persist as long as `state: "translated"` is set (this workflow always does).
 
 **Format specifier order** — If translation changes argument order, use positional specifiers (`%1$@`, `%2$@`) and note this in the translation task.
+
+**Leftover `.xcstrings.bak.*` files** — `apply_translations.py` creates a backup on every run. Check for and clean up old `.bak` files before starting a fresh localization pass:
+
+```bash
+ls -la path/to/*.xcstrings.bak.*  # List any backups
+rm path/to/*.xcstrings.bak.*      # Remove when no longer needed
+```
+
+The script uses timestamped names (e.g., `Localizable.xcstrings.bak.20260702143800`), so multiple runs produce multiple backups — check before you start a new session.
